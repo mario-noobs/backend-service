@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - "release/*"
+      - develop
+      - main
+  pull_request:
+    branches: [ develop, main ]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  ci:
+    uses: mario-noobs/ci-baseline/.github/workflows/_ci-java.yml@main
+    with:
+      gradle_tasks: "clean test jacocoTestReport jacocoTestCoverageVerification"
+      sonar_project_key: mario-noobs_backend-service
+      sonar_organization: mario-noobs
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  docker:
+    needs: ci
+    if: github.event_name == 'push'
+    uses: mario-noobs/ci-baseline/.github/workflows/_docker-build.yml@main
+    with:
+      image_name: backend-service
+      context: "."

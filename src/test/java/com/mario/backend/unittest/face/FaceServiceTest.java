@@ -19,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.List;
 import java.util.Optional;
 
 import static com.mario.backend.testutil.TestConstants.*;
@@ -48,7 +49,7 @@ class FaceServiceTest {
         when(idempotencyService.computeImageHash(SAMPLE_IMAGE_BASE64)).thenReturn(imageHash);
         when(faceImageRepository.existsByUserIdAndImageHash(USER_ID, imageHash)).thenReturn(false);
         when(httpClientService.post(anyString(), anyMap())).thenReturn(
-                "{\"code\":\"0000\",\"message\":\"Success\",\"data\":{\"face_encoding_base64\":\"encoded\"}}");
+                "{\"code\":\"0000\",\"message\":\"Success\",\"data\":{\"encoding\":\"encoded\",\"algorithmReg\":\"facenet_mobilenet\"}}");
         when(minioService.uploadImage(eq(USER_ID), eq(SAMPLE_IMAGE_BASE64))).thenReturn("1/image.jpg");
         when(minioService.getBucketName()).thenReturn("face-images");
         when(faceFeatureRepository.save(any(FaceFeature.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -85,21 +86,41 @@ class FaceServiceTest {
     }
 
     @Test
-    void recognizeFace_success() {
+    void recognizeFace_noCandidates_returnsNoFaces() {
+        when(faceFeatureRepository.findAllByStatusAndAlgorithmReg(
+                FaceFeature.FaceStatus.active, "facenet_mobilenet"))
+                .thenReturn(List.of());
+
+        FaceResponse response = faceService.recognizeFace(USER_ID, SAMPLE_IMAGE_BASE64);
+
+        assertThat(response.getSuccess()).isFalse();
+        assertThat(response.getCode()).isEqualTo("5002");
+    }
+
+    @Test
+    void recognizeFace_withCandidates_callsSearch() {
+        FaceFeature candidate = FaceFeature.builder()
+                .userId(2L)
+                .featureVector("encodedVector")
+                .algorithmReg("facenet_mobilenet")
+                .status(FaceFeature.FaceStatus.active)
+                .build();
+        when(faceFeatureRepository.findAllByStatusAndAlgorithmReg(
+                FaceFeature.FaceStatus.active, "facenet_mobilenet"))
+                .thenReturn(List.of(candidate));
         when(httpClientService.post(anyString(), anyMap())).thenReturn(
-                "{\"code\":\"0000\",\"status\":\"success\",\"message\":\"Match found\",\"data\":{\"confidence\":0.95}}");
+                "{\"code\":\"0000\",\"message\":\"Match found\",\"data\":{\"matches\":[{\"userId\":\"2\",\"distance\":0.5,\"matched\":true}]}}");
 
         FaceResponse response = faceService.recognizeFace(USER_ID, SAMPLE_IMAGE_BASE64);
 
         assertThat(response.getSuccess()).isTrue();
         assertThat(response.getMessage()).isEqualTo("Match found");
+        verify(httpClientService).post(contains("/api/v1/face/search"), anyMap());
     }
 
     @Test
     void deleteFace_success_deactivatesFeature() {
         FaceFeature feature = FaceFeature.builder().userId(USER_ID).status(FaceFeature.FaceStatus.active).build();
-        when(httpClientService.delete(anyString(), anyMap())).thenReturn(
-                "{\"code\":\"0000\",\"message\":\"Deleted\"}");
         when(faceFeatureRepository.findByUserIdAndStatus(USER_ID, FaceFeature.FaceStatus.active))
                 .thenReturn(Optional.of(feature));
         when(faceFeatureRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -108,6 +129,8 @@ class FaceServiceTest {
 
         assertThat(response.getSuccess()).isTrue();
         assertThat(feature.getStatus()).isEqualTo(FaceFeature.FaceStatus.inactive);
+        // No external HTTP call should be made for delete
+        verifyNoInteractions(httpClientService);
     }
 
     @Test

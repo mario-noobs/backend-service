@@ -25,6 +25,10 @@ public class FaceFeature {
     @Column(name = "feature_vector", columnDefinition = "TEXT")
     private String featureVector;
 
+    @Column(name = "algorithm_reg", length = 50)
+    @Builder.Default
+    private String algorithmReg = "facenet_mobilenet";
+
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
     @Builder.Default

@@ -1,5 +1,6 @@
 package com.mario.backend.face.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.mario.backend.common.exception.ApiException;
 import com.mario.backend.common.exception.ErrorCode;
 import com.mario.backend.common.http.ExternalServiceResponse;
@@ -7,7 +8,6 @@ import com.mario.backend.common.http.HttpClientException;
 import com.mario.backend.common.http.HttpClientService;
 import com.mario.backend.common.http.NonRetryableHttpException;
 import com.mario.backend.logging.annotation.Traceable;
-import com.mario.backend.logging.context.TraceContext;
 import com.mario.backend.face.dto.FaceResponse;
 import com.mario.backend.face.entity.FaceFeature;
 import com.mario.backend.face.entity.FaceImage;
@@ -19,15 +19,17 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.UUID;
-
-import static java.util.Optional.ofNullable;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class FaceService {
+
+    private static final String DEFAULT_DET_ALGORITHM = "retinaface_mobilenet";
+    private static final String DEFAULT_REG_ALGORITHM = "facenet_mobilenet";
 
     private final FaceFeatureRepository faceFeatureRepository;
     private final FaceImageRepository faceImageRepository;
@@ -50,27 +52,29 @@ public class FaceService {
         try {
             IdempotencyService.setCurrentKey(imageHash);
 
-            String url = faceRecognitionServiceUrl + "/face/create-identity";
-            String requestId = ofNullable(TraceContext.getTraceId()).orElseGet(() -> UUID.randomUUID().toString());
+            // Call face-ai-service /api/v1/face/encode (stateless)
+            String url = faceRecognitionServiceUrl + "/api/v1/face/encode";
 
             ExternalServiceResponse response = new ExternalServiceResponse(httpClientService.post(url, Map.of(
-                    "userId", String.valueOf(userId),
                     "imageBase64", imageData,
-                    "flow", "register",
-                    "requestId", requestId,
-                    "algorithmDet", "retinaface",
-                    "algorithmReg", "mobilenet"
+                    "algorithmDet", DEFAULT_DET_ALGORITHM,
+                    "algorithmReg", DEFAULT_REG_ALGORITHM
             )));
 
             if (response.isSuccess()) {
-                String encoding = response.getData() != null && response.getData().has("face_encoding_base64")
-                        ? response.getData().get("face_encoding_base64").asText()
+                JsonNode data = response.getData();
+                String encoding = data != null && data.has("encoding")
+                        ? data.get("encoding").asText()
                         : null;
+                String algorithmReg = data != null && data.has("algorithmReg")
+                        ? data.get("algorithmReg").asText()
+                        : DEFAULT_REG_ALGORITHM;
 
                 if (encoding != null) {
                     FaceFeature faceFeature = FaceFeature.builder()
                             .userId(userId)
                             .featureVector(encoding)
+                            .algorithmReg(algorithmReg)
                             .status(FaceFeature.FaceStatus.active)
                             .build();
                     faceFeatureRepository.save(faceFeature);
@@ -115,17 +119,39 @@ public class FaceService {
     @Traceable("face.recognizeFace")
     public FaceResponse recognizeFace(Long userId, String imageData) {
         try {
-            String url = faceRecognitionServiceUrl + "/face/recognize";
-            String requestId = ofNullable(TraceContext.getTraceId()).orElseGet(() -> UUID.randomUUID().toString());
+            String algorithmReg = DEFAULT_REG_ALGORITHM;
 
-            ExternalServiceResponse response = new ExternalServiceResponse(httpClientService.post(url, Map.of(
-                    "userId", String.valueOf(userId),
-                    "imageBase64", imageData,
-                    "flow", "recognize",
-                    "requestId", requestId,
-                    "algorithmDet", "retinaface",
-                    "algorithmReg", "mobilenet"
-            )));
+            // Load all active candidates encoded with the same algorithm from MySQL
+            List<FaceFeature> candidates = faceFeatureRepository
+                    .findAllByStatusAndAlgorithmReg(FaceFeature.FaceStatus.active, algorithmReg);
+
+            if (candidates.isEmpty()) {
+                return FaceResponse.builder()
+                        .success(false)
+                        .code("5002")
+                        .message("No registered faces found")
+                        .userId(userId)
+                        .build();
+            }
+
+            List<Map<String, String>> candidateList = candidates.stream()
+                    .map(f -> Map.of(
+                            "userId", String.valueOf(f.getUserId()),
+                            "encoding", f.getFeatureVector()
+                    ))
+                    .toList();
+
+            // Call face-ai-service /api/v1/face/search (stateless)
+            String url = faceRecognitionServiceUrl + "/api/v1/face/search";
+
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("imageBase64", imageData);
+            requestBody.put("algorithmDet", DEFAULT_DET_ALGORITHM);
+            requestBody.put("algorithmReg", algorithmReg);
+            requestBody.put("candidates", candidateList);
+
+            ExternalServiceResponse response = new ExternalServiceResponse(
+                    httpClientService.post(url, requestBody));
 
             return FaceResponse.builder()
                     .success(response.isSuccess())
@@ -150,41 +176,19 @@ public class FaceService {
     @Traceable("face.deleteFace")
     @Transactional
     public FaceResponse deleteFace(Long userId) {
-        try {
-            String url = faceRecognitionServiceUrl + "/face/delete-identity";
-            String requestId = ofNullable(TraceContext.getTraceId()).orElseGet(() -> UUID.randomUUID().toString());
+        // No external service call needed — just mark inactive in MySQL
+        faceFeatureRepository.findByUserIdAndStatus(userId, FaceFeature.FaceStatus.active)
+                .ifPresent(feature -> {
+                    feature.setStatus(FaceFeature.FaceStatus.inactive);
+                    faceFeatureRepository.save(feature);
+                });
 
-            ExternalServiceResponse response = new ExternalServiceResponse(httpClientService.delete(url, Map.of(
-                    "userId", String.valueOf(userId),
-                    "algorithm", "mobilenet",
-                    "requestId", requestId
-            )));
-
-            if (response.isSuccess()) {
-                faceFeatureRepository.findByUserIdAndStatus(userId, FaceFeature.FaceStatus.active)
-                        .ifPresent(feature -> {
-                            feature.setStatus(FaceFeature.FaceStatus.inactive);
-                            faceFeatureRepository.save(feature);
-                        });
-            }
-
-            return FaceResponse.builder()
-                    .success(response.isSuccess())
-                    .message(response.getMessage())
-                    .userId(userId)
-                    .code(response.isSuccess() ? "0000" : ErrorCode.FACE_DELETION_FAILED.getCode())
-                    .build();
-        } catch (NonRetryableHttpException e) {
-            log.error("External service rejected face deletion for userId={}: status={}, message={}",
-                    userId, e.getHttpStatusCode(), e.getMessage());
-            throw new ApiException(ErrorCode.FACE_DELETION_FAILED, e.getMessage());
-        } catch (HttpClientException e) {
-            log.error("External service unavailable during face deletion for userId={}: {}", userId, e.getMessage());
-            throw new ApiException(ErrorCode.EXTERNAL_SERVICE_RETRY_EXHAUSTED, e.getMessage());
-        } catch (Exception e) {
-            log.error("Failed to delete face for userId={}: {}", userId, e.getMessage());
-            throw new ApiException(ErrorCode.FACE_DELETION_FAILED, "Failed to delete face: " + e.getMessage());
-        }
+        return FaceResponse.builder()
+                .success(true)
+                .message("Face data deleted successfully")
+                .userId(userId)
+                .code("0000")
+                .build();
     }
 
     @Traceable("face.isRegistered")

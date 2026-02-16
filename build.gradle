@@ -4,6 +4,7 @@ plugins {
     id 'io.spring.dependency-management' version '1.1.6'
     id 'jacoco'
     id "org.sonarqube" version "7.1.0.6387"
+    id 'org.owasp.dependencycheck' version '12.1.1'
 }
 
 group = 'com.mario'
@@ -214,7 +215,7 @@ if (sonarEnvFile.exists()) {
 
 sonar {
     properties {
-        property 'sonar.projectKey', System.getenv('SONAR_PROJECT_KEY') ?: System.getProperty('SONAR_PROJECT_KEY') ?: 'mario-noobs_face-microservice'
+        property 'sonar.projectKey', System.getenv('SONAR_PROJECT_KEY') ?: System.getProperty('SONAR_PROJECT_KEY') ?: 'mario-noobs_backend-service'
         property 'sonar.organization', System.getenv('SONAR_ORGANIZATION') ?: System.getProperty('SONAR_ORGANIZATION') ?: 'mario-noobs'
         property 'sonar.host.url', 'https://sonarcloud.io'
         property 'sonar.token', System.getenv('SONAR_TOKEN') ?: System.getProperty('SONAR_TOKEN') ?: ''
@@ -224,5 +225,14 @@ sonar {
         property 'sonar.coverage.jacoco.xmlReportPaths', "${layout.buildDirectory.get()}/reports/jacoco/test/jacocoTestReport.xml"
         property 'sonar.exclusions', '**/dto/**,**/entity/**,**/config/**,**/BackendApplication.java'
         property 'sonar.coverage.exclusions', '**/dto/**,**/entity/**,**/config/**,**/BackendApplication.java'
+    }
+}
+
+// OWASP Dependency Check
+dependencyCheck {
+    failBuildOnCVSS = 7
+    formats = ['HTML', 'JSON']
+    nvd {
+        apiKey = System.getenv('NVD_API_KEY') ?: ''
     }
 }

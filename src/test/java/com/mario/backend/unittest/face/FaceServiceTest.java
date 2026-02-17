@@ -11,6 +11,7 @@ import com.mario.backend.face.repository.FaceImageRepository;
 import com.mario.backend.face.service.FaceService;
 import com.mario.backend.face.service.IdempotencyService;
 import com.mario.backend.face.service.MinioService;
+import com.mario.backend.users.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,6 +33,7 @@ class FaceServiceTest {
 
     @Mock private FaceFeatureRepository faceFeatureRepository;
     @Mock private FaceImageRepository faceImageRepository;
+    @Mock private UserRepository userRepository;
     @Mock private MinioService minioService;
     @Mock private HttpClientService httpClientService;
     @Mock private IdempotencyService idempotencyService;

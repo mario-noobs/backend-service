@@ -1,5 +1,6 @@
 package com.mario.backend.common.http;
 
+import com.mario.backend.logging.context.TraceContext;
 import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,8 +25,7 @@ public class HttpClientService {
 
     @Retry(name = "externalService", fallbackMethod = "handleRetryExhausted")
     public String get(String url) {
-        Request request = new Request.Builder()
-                .url(url)
+        Request request = newRequestBuilder(url)
                 .get()
                 .build();
         return execute(request, url);
@@ -33,8 +33,7 @@ public class HttpClientService {
 
     @Retry(name = "externalService", fallbackMethod = "handleRetryExhaustedWithBody")
     public String post(String url, Map<String, Object> body) {
-        Request request = new Request.Builder()
-                .url(url)
+        Request request = newRequestBuilder(url)
                 .post(buildRequestBody(body, url))
                 .build();
         return execute(request, url);
@@ -42,8 +41,7 @@ public class HttpClientService {
 
     @Retry(name = "externalService", fallbackMethod = "handleRetryExhaustedWithBody")
     public String put(String url, Map<String, Object> body) {
-        Request request = new Request.Builder()
-                .url(url)
+        Request request = newRequestBuilder(url)
                 .put(buildRequestBody(body, url))
                 .build();
         return execute(request, url);
@@ -51,8 +49,7 @@ public class HttpClientService {
 
     @Retry(name = "externalService", fallbackMethod = "handleRetryExhaustedWithBody")
     public String delete(String url, Map<String, Object> body) {
-        Request request = new Request.Builder()
-                .url(url)
+        Request request = newRequestBuilder(url)
                 .delete(buildRequestBody(body, url))
                 .build();
         return execute(request, url);
@@ -60,11 +57,19 @@ public class HttpClientService {
 
     @Retry(name = "externalService", fallbackMethod = "handleRetryExhausted")
     public String delete(String url) {
-        Request request = new Request.Builder()
-                .url(url)
+        Request request = newRequestBuilder(url)
                 .delete()
                 .build();
         return execute(request, url);
+    }
+
+    private Request.Builder newRequestBuilder(String url) {
+        Request.Builder builder = new Request.Builder().url(url);
+        String traceId = TraceContext.getTraceId();
+        if (traceId != null) {
+            builder.addHeader("X-Request-ID", traceId);
+        }
+        return builder;
     }
 
     private RequestBody buildRequestBody(Map<String, Object> body, String url) {

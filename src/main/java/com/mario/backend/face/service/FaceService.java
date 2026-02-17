@@ -1,6 +1,9 @@
 package com.mario.backend.face.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.mario.backend.common.exception.ApiException;
 import com.mario.backend.common.exception.ErrorCode;
 import com.mario.backend.common.http.ExternalServiceResponse;
@@ -13,6 +16,8 @@ import com.mario.backend.face.entity.FaceFeature;
 import com.mario.backend.face.entity.FaceImage;
 import com.mario.backend.face.repository.FaceFeatureRepository;
 import com.mario.backend.face.repository.FaceImageRepository;
+import com.mario.backend.users.entity.User;
+import com.mario.backend.users.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,6 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -31,8 +38,11 @@ public class FaceService {
     private static final String DEFAULT_DET_ALGORITHM = "retinaface_mobilenet";
     private static final String DEFAULT_REG_ALGORITHM = "facenet_mobilenet";
 
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     private final FaceFeatureRepository faceFeatureRepository;
     private final FaceImageRepository faceImageRepository;
+    private final UserRepository userRepository;
     private final MinioService minioService;
     private final HttpClientService httpClientService;
     private final IdempotencyService idempotencyService;
@@ -153,12 +163,14 @@ public class FaceService {
             ExternalServiceResponse response = new ExternalServiceResponse(
                     httpClientService.post(url, requestBody));
 
+            JsonNode enrichedData = enrichMatchesWithUserInfo(response.getData());
+
             return FaceResponse.builder()
                     .success(response.isSuccess())
                     .message(response.getMessage())
                     .userId(userId)
                     .code(response.getCode())
-                    .data(response.getData())
+                    .data(enrichedData)
                     .build();
         } catch (NonRetryableHttpException e) {
             log.error("External service rejected face recognition for userId={}: status={}, message={}",
@@ -189,6 +201,71 @@ public class FaceService {
                 .userId(userId)
                 .code("0000")
                 .build();
+    }
+
+    private JsonNode enrichMatchesWithUserInfo(JsonNode data) {
+        if (data == null || !data.has("matches")) {
+            return data;
+        }
+
+        JsonNode matchesNode = data.get("matches");
+        if (!matchesNode.isArray() || matchesNode.isEmpty()) {
+            return data;
+        }
+
+        // Filter to matched entries only (prevent leaking unmatched user info)
+        List<JsonNode> matchedOnly = new java.util.ArrayList<>();
+        for (JsonNode match : matchesNode) {
+            if (match.has("matched") && match.get("matched").asBoolean()) {
+                matchedOnly.add(match);
+            }
+        }
+
+        // Collect userIds from matched entries
+        List<Long> userIds = new java.util.ArrayList<>();
+        for (JsonNode match : matchedOnly) {
+            if (match.has("userId")) {
+                try {
+                    userIds.add(Long.parseLong(match.get("userId").asText()));
+                } catch (NumberFormatException e) {
+                    log.warn("Invalid userId in match: {}", match.get("userId").asText());
+                }
+            }
+        }
+
+        // Batch fetch users
+        Map<Long, User> userMap = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
+
+        // Build enriched matches array (matched only)
+        ArrayNode enrichedMatches = OBJECT_MAPPER.createArrayNode();
+        for (JsonNode match : matchedOnly) {
+            ObjectNode enrichedMatch = OBJECT_MAPPER.createObjectNode();
+            enrichedMatch.put("userId", match.get("userId").asText());
+            enrichedMatch.put("distance", match.get("distance").asDouble());
+            enrichedMatch.put("matched", true);
+
+            try {
+                Long matchUserId = Long.parseLong(match.get("userId").asText());
+                User user = userMap.get(matchUserId);
+                if (user != null) {
+                    enrichedMatch.put("firstName", user.getFirstName());
+                    enrichedMatch.put("lastName", user.getLastName());
+                }
+            } catch (NumberFormatException ignored) {
+                // userId wasn't a valid number, skip enrichment
+            }
+
+            enrichedMatches.add(enrichedMatch);
+        }
+
+        // Build enriched data node
+        ObjectNode enrichedData = OBJECT_MAPPER.createObjectNode();
+        enrichedData.set("matches", enrichedMatches);
+        if (data.has("query_encoding")) {
+            enrichedData.put("query_encoding", data.get("query_encoding").asText());
+        }
+        return enrichedData;
     }
 
     @Traceable("face.isRegistered")

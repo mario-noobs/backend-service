@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+  <!-- Baseline: full schema + RBAC seed data -->
+  <changeSet id="0.0.0-baseline" author="dung.bui">
+    <sqlFile path="0.0.0__baseline.mysql.sql"/>
+  </changeSet>
+
+  <!-- Add algorithm_reg column to face_features -->
+  <changeSet id="20260217-01" author="dung.bui">
+    <sqlFile path="../common/2026.02.17_01__add_algorithm_reg_column.sql"/>
+  </changeSet>
+
+</databaseChangeLog>

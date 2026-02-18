@@ -52,6 +52,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
 
             Long userId = jwtTokenProvider.getUserIdFromToken(token);
+
+            // Check user-level blacklist (set when admin bans/deactivates a user)
+            long issuedAt = jwtTokenProvider.getIssuedAtFromToken(token).getTime();
+            if (tokenBlacklistService.isUserBlacklisted(userId, issuedAt)) {
+                log.warn("Token rejected: user {} has been blacklisted", userId);
+                filterChain.doFilter(request, response);
+                return;
+            }
+
             String email = jwtTokenProvider.getEmailFromToken(token);
             String roleName = jwtTokenProvider.getRoleFromToken(token);
             List<String> permissions = jwtTokenProvider.getPermissionsFromToken(token);

@@ -117,6 +117,11 @@ public class JwtTokenProvider {
         return claims.getExpiration();
     }
 
+    public Date getIssuedAtFromToken(String token) {
+        Claims claims = parseToken(token);
+        return claims.getIssuedAt();
+    }
+
     private Claims parseToken(String token) {
         return Jwts.parser()
                 .verifyWith(secretKey)

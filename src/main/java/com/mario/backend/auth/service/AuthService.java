@@ -93,6 +93,8 @@ public class AuthService {
         User user = userRepository.findById(auth.getUserId())
                 .orElseThrow(() -> new ApiException(ErrorCode.INVALID_CREDENTIALS, "User not found"));
 
+        checkUserStatus(user);
+
         return generateTokenResponse(user);
     }
 
@@ -120,6 +122,8 @@ public class AuthService {
         // Load user from DB to get current role (picks up role changes)
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ApiException(ErrorCode.INVALID_TOKEN, "User not found"));
+
+        checkUserStatus(user);
 
         return generateTokenResponse(user);
     }
@@ -234,6 +238,19 @@ public class AuthService {
         userRepository.save(user);
 
         return generateTokenResponse(user);
+    }
+
+    private void checkUserStatus(User user) {
+        switch (user.getStatus()) {
+            case deactivated -> throw new ApiException(ErrorCode.ACCOUNT_DEACTIVATED);
+            case banned -> throw new ApiException(ErrorCode.ACCOUNT_BANNED);
+            case invited -> throw new ApiException(ErrorCode.ACCOUNT_NOT_ACTIVATED);
+            case activated -> { /* OK */ }
+        }
+    }
+
+    public void blacklistUser(Long userId) {
+        tokenBlacklistService.blacklistUser(userId);
     }
 
     private TokenResponse generateTokenResponse(User user) {

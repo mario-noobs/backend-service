@@ -2,6 +2,7 @@ package com.mario.backend.users.service;
 
 import com.mario.backend.auth.entity.Auth;
 import com.mario.backend.auth.repository.AuthRepository;
+import com.mario.backend.auth.service.TokenBlacklistService;
 import com.mario.backend.common.exception.ApiException;
 import com.mario.backend.common.exception.ErrorCode;
 import com.mario.backend.logging.annotation.Traceable;
@@ -38,6 +39,7 @@ public class UserService {
     private final AuthRepository authRepository;
     private final RoleRepository roleRepository;
     private final EmailService emailService;
+    private final TokenBlacklistService tokenBlacklistService;
 
     @Value("${app.frontend-url:http://localhost}")
     private String frontendUrl;
@@ -125,13 +127,21 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
 
+        User.UserStatus newStatus;
         try {
-            user.setStatus(User.UserStatus.valueOf(status));
+            newStatus = User.UserStatus.valueOf(status);
         } catch (IllegalArgumentException e) {
             throw new ApiException(ErrorCode.INVALID_USER_STATUS, "Invalid status: " + status + ". Must be one of: activated, deactivated, banned");
         }
 
+        user.setStatus(newStatus);
         user = userRepository.save(user);
+
+        // Invalidate all existing tokens when deactivating or banning
+        if (newStatus == User.UserStatus.deactivated || newStatus == User.UserStatus.banned) {
+            tokenBlacklistService.blacklistUser(userId);
+        }
+
         return mapToResponse(user);
     }
 

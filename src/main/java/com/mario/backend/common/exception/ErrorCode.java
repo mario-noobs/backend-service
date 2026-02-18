@@ -19,6 +19,10 @@ public enum ErrorCode {
     RESET_TOKEN_INVALID(HttpStatus.BAD_REQUEST, "RESET_TOKEN_INVALID", "Invalid or expired reset token"),
     INVITATION_TOKEN_INVALID(HttpStatus.BAD_REQUEST, "INVITATION_TOKEN_INVALID", "Invalid or expired invitation token"),
 
+    ACCOUNT_DEACTIVATED(HttpStatus.FORBIDDEN, "ACCOUNT_DEACTIVATED", "Your account has been deactivated"),
+    ACCOUNT_BANNED(HttpStatus.FORBIDDEN, "ACCOUNT_BANNED", "Your account has been banned"),
+    ACCOUNT_NOT_ACTIVATED(HttpStatus.FORBIDDEN, "ACCOUNT_NOT_ACTIVATED", "Your account is not yet activated"),
+
     // User errors
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found"),
     INVALID_USER_STATUS(HttpStatus.BAD_REQUEST, "INVALID_USER_STATUS", "Invalid user status"),

@@ -1,12 +1,15 @@
 package com.mario.backend.auth.controller;
 
 import com.mario.backend.auth.dto.*;
+import com.mario.backend.auth.security.AuthenticatedUser;
 import com.mario.backend.auth.service.AuthService;
 import com.mario.backend.common.dto.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -38,5 +41,14 @@ public class AuthController {
     public ResponseEntity<ApiResponse<String>> logout(@Valid @RequestBody LogoutRequest request) {
         authService.logout(request);
         return ResponseEntity.ok(ApiResponse.success("Logged out successfully"));
+    }
+
+    @PutMapping("/change-password")
+    @PreAuthorize("hasAuthority('user:update_self')")
+    public ResponseEntity<ApiResponse<String>> changePassword(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @Valid @RequestBody ChangePasswordRequest request) {
+        authService.changePassword(user.getUserId(), request);
+        return ResponseEntity.ok(ApiResponse.success("Password changed successfully"));
     }
 }

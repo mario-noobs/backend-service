@@ -9,6 +9,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
+
 @RestController
 @RequestMapping("/api/v1/audit")
 @RequiredArgsConstructor
@@ -33,5 +35,21 @@ public class AuditController {
             @RequestParam(defaultValue = "20") int size) {
         PageResponse<AuditLogResponse> auditLogs = auditService.getAuditLogsByUserId(userId, page, size);
         return ResponseEntity.ok(ApiResponse.success(auditLogs));
+    }
+
+    @GetMapping("/search")
+    @PreAuthorize("hasAuthority('audit:read_all')")
+    public ResponseEntity<ApiResponse<PageResponse<AuditLogResponse>>> searchAuditLogs(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String action,
+            @RequestParam(required = false) String targetType,
+            @RequestParam(required = false) String outcome,
+            @RequestParam(required = false) LocalDateTime from,
+            @RequestParam(required = false) LocalDateTime to,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        PageResponse<AuditLogResponse> results = auditService.searchAuditLogs(
+                q, action, targetType, outcome, from, to, page, size);
+        return ResponseEntity.ok(ApiResponse.success(results));
     }
 }

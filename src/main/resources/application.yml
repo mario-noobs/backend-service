@@ -35,6 +35,40 @@ spring:
       timeout: 5000ms
       password: ${REDIS_PASSWORD:}
 
+  # RabbitMQ
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    listener:
+      simple:
+        acknowledge-mode: auto
+        retry:
+          enabled: true
+          initial-interval: 1000
+          max-interval: 10000
+          multiplier: 2.0
+          max-attempts: 3
+        default-requeue-rejected: false
+
+  # Mail
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+  # Elasticsearch
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
+
   # Jackson
   jackson:
     serialization:
@@ -92,3 +126,18 @@ resilience4j:
         ignore-exceptions:
           - com.mario.backend.common.http.NonRetryableHttpException
           - com.mario.backend.common.exception.ApiException
+
+# Email Service Library
+app:
+  email:
+    from-address: ${EMAIL_FROM:noreply@face-system.local}
+    from-name: Face Recognition System
+
+# Alert Configuration
+alert:
+  recipients: ${ALERT_RECIPIENTS:admin@face-system.local}
+  failed-auth:
+    threshold: 5
+    window-minutes: 10
+  server-error:
+    enabled: true

@@ -31,6 +31,8 @@ public class UserResponse {
 
     private RoleInfo role;
 
+    private UserProfileResponse profile;
+
     @JsonProperty("created_at")
     private LocalDateTime createdAt;
 

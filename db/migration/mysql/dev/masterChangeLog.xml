@@ -15,4 +15,14 @@
     <sqlFile path="../common/2026.02.17_01__add_algorithm_reg_column.sql"/>
   </changeSet>
 
+  <!-- Create user_profiles table for extended profile data -->
+  <changeSet id="20260218-01" author="dung.bui">
+    <sqlFile path="../common/2026.02.18_01__create_user_profiles_table.sql"/>
+  </changeSet>
+
+  <!-- Enrich audit_logs with actor/action/target/outcome fields -->
+  <changeSet id="20260218-02" author="dung.bui">
+    <sqlFile path="../common/2026.02.18_02__enrich_audit_logs.sql"/>
+  </changeSet>
+
 </databaseChangeLog>

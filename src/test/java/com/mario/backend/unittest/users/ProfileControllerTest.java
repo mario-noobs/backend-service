@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mario.backend.auth.security.AuthenticatedUser;
 import com.mario.backend.auth.security.JwtTokenProvider;
 import com.mario.backend.auth.service.TokenBlacklistService;
-import com.mario.backend.audit.service.AuditService;
+import com.mario.backend.audit.publisher.AuditEventPublisher;
 import com.mario.backend.users.controller.ProfileController;
 import com.mario.backend.users.dto.UpdateProfileRequest;
 import com.mario.backend.users.dto.UserResponse;
@@ -40,7 +40,7 @@ class ProfileControllerTest {
     @MockBean private UserService userService;
     @MockBean private JwtTokenProvider jwtTokenProvider;
     @MockBean private TokenBlacklistService tokenBlacklistService;
-    @MockBean private AuditService auditService;
+    @MockBean private AuditEventPublisher auditEventPublisher;
 
     private RequestPostProcessor basicUser() {
         AuthenticatedUser principal = new AuthenticatedUser(USER_ID, USER_EMAIL, ROLE_BASIC_USER, BASIC_USER_PERMISSIONS);

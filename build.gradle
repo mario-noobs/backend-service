@@ -61,6 +61,19 @@ dependencies {
     // Spring AOP for @Traceable
     implementation 'org.springframework.boot:spring-boot-starter-aop'
 
+    // RabbitMQ (AMQP)
+    implementation 'org.springframework.boot:spring-boot-starter-amqp'
+
+    // Spring Mail
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
+
+    // Elasticsearch
+    implementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch'
+
+    // Email Service Library (local JAR) + its transitive dependency
+    implementation files('libs/email-service-1.0.0.jar')
+    implementation 'org.freemarker:freemarker:2.3.32'
+
     // Vault
     implementation 'org.springframework.cloud:spring-cloud-starter-vault-config'
 

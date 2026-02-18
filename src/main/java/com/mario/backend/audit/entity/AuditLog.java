@@ -24,6 +24,24 @@ public class AuditLog {
     @Column(name = "user_id")
     private Long userId;
 
+    @Column(name = "actor_email")
+    private String actorEmail;
+
+    @Column(name = "actor_role", length = 50)
+    private String actorRole;
+
+    @Column(name = "action", length = 100)
+    private String action;
+
+    @Column(name = "target_type", length = 50)
+    private String targetType;
+
+    @Column(name = "target_id", length = 100)
+    private String targetId;
+
+    @Column(name = "outcome", length = 20)
+    private String outcome;
+
     @Column(length = 10)
     private String method;
 

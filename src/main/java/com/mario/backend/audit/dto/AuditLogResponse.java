@@ -22,6 +22,22 @@ public class AuditLogResponse {
     @JsonProperty("user_id")
     private Long userId;
 
+    @JsonProperty("actor_email")
+    private String actorEmail;
+
+    @JsonProperty("actor_role")
+    private String actorRole;
+
+    private String action;
+
+    @JsonProperty("target_type")
+    private String targetType;
+
+    @JsonProperty("target_id")
+    private String targetId;
+
+    private String outcome;
+
     private String method;
 
     private String path;

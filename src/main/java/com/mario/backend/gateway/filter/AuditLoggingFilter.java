@@ -1,7 +1,9 @@
 package com.mario.backend.gateway.filter;
 
-import com.mario.backend.audit.entity.AuditLog;
-import com.mario.backend.audit.service.AuditService;
+import com.mario.backend.audit.event.AuditActionMapper;
+import com.mario.backend.audit.event.AuditActionMapper.AuditActionMapping;
+import com.mario.backend.audit.event.AuditEvent;
+import com.mario.backend.audit.publisher.AuditEventPublisher;
 import com.mario.backend.auth.security.AuthenticatedUser;
 import com.mario.backend.logging.context.TraceContext;
 import jakarta.servlet.FilterChain;
@@ -19,6 +21,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Slf4j
@@ -27,7 +30,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AuditLoggingFilter extends OncePerRequestFilter {
 
-    private final AuditService auditService;
+    private final AuditEventPublisher auditEventPublisher;
 
     @Override
     protected void doFilterInternal(
@@ -46,44 +49,54 @@ public class AuditLoggingFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
         } finally {
             long duration = System.currentTimeMillis() - startTime;
+            int statusCode = response.getStatus();
 
-            Long userId = extractUserId();
-            if (userId != null) {
-                Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-                String email = (auth != null && auth.getPrincipal() instanceof AuthenticatedUser u)
-                        ? u.getEmail() : null;
-                TraceContext.setUser(userId, email);
+            // Extract actor info from SecurityContext
+            Long actorId = null;
+            String actorEmail = null;
+            String actorRole = null;
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getPrincipal() instanceof AuthenticatedUser user) {
+                actorId = user.getUserId();
+                actorEmail = user.getEmail();
+                actorRole = user.getRoleName();
+                TraceContext.setUser(actorId, actorEmail);
             }
 
-            AuditLog auditLog = AuditLog.builder()
+            // Resolve semantic action mapping
+            String httpMethod = request.getMethod();
+            String httpPath = request.getRequestURI();
+            AuditActionMapping mapping = AuditActionMapper.resolve(httpMethod, httpPath);
+
+            // Determine outcome
+            String outcome = statusCode < 400 ? "success" : "failure";
+
+            // Build enriched audit event
+            AuditEvent event = AuditEvent.builder()
+                    .actorId(actorId)
+                    .actorEmail(actorEmail)
+                    .actorIp(getClientIp(request))
+                    .actorAgent(request.getHeader("User-Agent"))
+                    .actorRole(actorRole)
+                    .action(mapping.action())
+                    .httpMethod(httpMethod)
+                    .httpPath(httpPath)
+                    .targetType(mapping.targetType())
+                    .targetId(mapping.targetId())
+                    .outcome(outcome)
+                    .statusCode(statusCode)
                     .requestId(requestId)
-                    .userId(userId)
-                    .method(request.getMethod())
-                    .path(request.getRequestURI())
-                    .statusCode(response.getStatus())
-                    .clientIp(getClientIp(request))
-                    .userAgent(request.getHeader("User-Agent"))
                     .durationMs(duration)
+                    .timestamp(LocalDateTime.now())
                     .build();
 
-            auditService.saveAuditLog(auditLog);
+            auditEventPublisher.publish(event);
 
             log.info("Request completed: {} {} {} {}ms",
-                    request.getMethod(),
-                    request.getRequestURI(),
-                    response.getStatus(),
-                    duration);
+                    httpMethod, httpPath, statusCode, duration);
 
             TraceContext.clear();
         }
-    }
-
-    private Long extractUserId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.getPrincipal() instanceof AuthenticatedUser user) {
-            return user.getUserId();
-        }
-        return null;
     }
 
     private String getClientIp(HttpServletRequest request) {
@@ -97,6 +110,6 @@ public class AuditLoggingFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return path.startsWith("/actuator") || path.equals("/ping");
+        return path.startsWith("/actuator") || path.equals("/ping") || path.startsWith("/api/v1/audit");
     }
 }

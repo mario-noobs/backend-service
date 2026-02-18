@@ -1,6 +1,7 @@
 package com.mario.backend.users.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -23,4 +24,7 @@ public class UpdateProfileRequest {
 
     @Size(max = 20, message = "Phone must not exceed 20 characters")
     private String phone;
+
+    @Valid
+    private UpdateUserProfileRequest profile;
 }

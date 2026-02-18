@@ -109,6 +109,28 @@ public class AuthService {
         return generateTokenResponse(user);
     }
 
+    @Traceable("auth.changePassword")
+    @Transactional
+    public void changePassword(Long userId, ChangePasswordRequest request) {
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new ApiException(ErrorCode.PASSWORD_MISMATCH);
+        }
+
+        Auth auth = authRepository.findByUserId(userId)
+                .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
+
+        if (!BCrypt.checkpw(request.getCurrentPassword(), auth.getPassword())) {
+            throw new ApiException(ErrorCode.WRONG_PASSWORD);
+        }
+
+        String salt = BCrypt.gensalt();
+        String hashedPassword = BCrypt.hashpw(request.getNewPassword(), salt);
+
+        auth.setSalt(salt);
+        auth.setPassword(hashedPassword);
+        authRepository.save(auth);
+    }
+
     @Traceable("auth.logout")
     public void logout(LogoutRequest request) {
         String accessToken = request.getAccessToken();

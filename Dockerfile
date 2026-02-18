@@ -6,6 +6,7 @@ WORKDIR /app
 # Copy build files first for better caching
 COPY build.gradle .
 COPY settings.gradle .
+COPY libs libs
 
 # Download dependencies (cached layer)
 RUN gradle dependencies --no-daemon || true

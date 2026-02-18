@@ -3,7 +3,7 @@ package com.mario.backend.unittest.face;
 import com.mario.backend.auth.security.AuthenticatedUser;
 import com.mario.backend.auth.security.JwtTokenProvider;
 import com.mario.backend.auth.service.TokenBlacklistService;
-import com.mario.backend.audit.service.AuditService;
+import com.mario.backend.audit.publisher.AuditEventPublisher;
 import com.mario.backend.face.controller.FaceController;
 import com.mario.backend.face.dto.FaceResponse;
 import com.mario.backend.face.service.FaceService;
@@ -36,7 +36,7 @@ class FaceControllerTest {
     @MockBean private FaceService faceService;
     @MockBean private JwtTokenProvider jwtTokenProvider;
     @MockBean private TokenBlacklistService tokenBlacklistService;
-    @MockBean private AuditService auditService;
+    @MockBean private AuditEventPublisher auditEventPublisher;
 
     private RequestPostProcessor premiumUser() {
         AuthenticatedUser principal = new AuthenticatedUser(USER_ID, USER_EMAIL, ROLE_PREMIUM_USER, PREMIUM_USER_PERMISSIONS);

@@ -50,6 +50,6 @@ public class User {
     private LocalDateTime updatedAt;
 
     public enum UserStatus {
-        activated, deactivated, banned
+        activated, deactivated, banned, invited
     }
 }

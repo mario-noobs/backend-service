@@ -16,6 +16,8 @@ public enum ErrorCode {
     INVALID_TOKEN_TYPE(HttpStatus.UNAUTHORIZED, "INVALID_TOKEN_TYPE", "Invalid token type"),
     WRONG_PASSWORD(HttpStatus.BAD_REQUEST, "WRONG_PASSWORD", "Current password is incorrect"),
     PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, "PASSWORD_MISMATCH", "New password and confirm password do not match"),
+    RESET_TOKEN_INVALID(HttpStatus.BAD_REQUEST, "RESET_TOKEN_INVALID", "Invalid or expired reset token"),
+    INVITATION_TOKEN_INVALID(HttpStatus.BAD_REQUEST, "INVITATION_TOKEN_INVALID", "Invalid or expired invitation token"),
 
     // User errors
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found"),

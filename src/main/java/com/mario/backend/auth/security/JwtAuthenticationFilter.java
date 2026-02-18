@@ -71,6 +71,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
+
+            // Store in request attribute so AuditLoggingFilter can read it
+            // after SecurityContextHolderFilter clears the ThreadLocal
+            request.setAttribute("_audit_user", principal);
         }
 
         filterChain.doFilter(request, response);

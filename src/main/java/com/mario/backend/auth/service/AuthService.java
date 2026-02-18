@@ -12,14 +12,19 @@ import com.mario.backend.rbac.entity.Role;
 import com.mario.backend.rbac.repository.RoleRepository;
 import com.mario.backend.users.entity.User;
 import com.mario.backend.users.repository.UserRepository;
+import com.mario.email.EmailRequest;
+import com.mario.email.EmailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -31,6 +36,16 @@ public class AuthService {
     private final RoleRepository roleRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final TokenBlacklistService tokenBlacklistService;
+    private final EmailService emailService;
+
+    @Value("${app.frontend-url:http://localhost}")
+    private String frontendUrl;
+
+    @Value("${app.password-reset.expiry-minutes:30}")
+    private int resetExpiryMinutes;
+
+    @Value("${app.invitation.expiry-hours:72}")
+    private int invitationExpiryHours;
 
     @Traceable("auth.register")
     @Transactional
@@ -138,6 +153,87 @@ public class AuthService {
         if (jwtTokenProvider.validateToken(accessToken)) {
             tokenBlacklistService.blacklistToken(accessToken, jwtTokenProvider.getExpirationFromToken(accessToken));
         }
+    }
+
+    @Traceable("auth.forgotPassword")
+    @Transactional
+    public void forgotPassword(ForgotPasswordRequest request) {
+        authRepository.findByEmail(request.getEmail()).ifPresent(auth -> {
+            String token = UUID.randomUUID().toString();
+            auth.setResetToken(token);
+            auth.setResetTokenExpiry(LocalDateTime.now().plusMinutes(resetExpiryMinutes));
+            authRepository.save(auth);
+
+            User user = userRepository.findById(auth.getUserId()).orElse(null);
+            String firstName = user != null ? user.getFirstName() : "User";
+
+            String resetUrl = frontendUrl + "/reset-password?token=" + token;
+
+            emailService.send(EmailRequest.builder()
+                    .to(auth.getEmail())
+                    .subject("Password Reset Request")
+                    .templateName("password-reset")
+                    .model("firstName", firstName)
+                    .model("resetUrl", resetUrl)
+                    .model("expiryMinutes", resetExpiryMinutes)
+                    .build());
+        });
+        // Silently succeed even if email not found (prevent enumeration)
+    }
+
+    @Traceable("auth.resetPassword")
+    @Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new ApiException(ErrorCode.PASSWORD_MISMATCH);
+        }
+
+        Auth auth = authRepository.findByResetToken(request.getToken())
+                .orElseThrow(() -> new ApiException(ErrorCode.RESET_TOKEN_INVALID));
+
+        if (auth.getResetTokenExpiry() == null || auth.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
+            throw new ApiException(ErrorCode.RESET_TOKEN_INVALID);
+        }
+
+        String salt = BCrypt.gensalt();
+        String hashedPassword = BCrypt.hashpw(request.getNewPassword(), salt);
+
+        auth.setSalt(salt);
+        auth.setPassword(hashedPassword);
+        auth.setResetToken(null);
+        auth.setResetTokenExpiry(null);
+        authRepository.save(auth);
+    }
+
+    @Traceable("auth.acceptInvitation")
+    @Transactional
+    public TokenResponse acceptInvitation(AcceptInvitationRequest request) {
+        if (!request.getPassword().equals(request.getConfirmPassword())) {
+            throw new ApiException(ErrorCode.PASSWORD_MISMATCH);
+        }
+
+        Auth auth = authRepository.findByInvitationToken(request.getToken())
+                .orElseThrow(() -> new ApiException(ErrorCode.INVITATION_TOKEN_INVALID));
+
+        if (auth.getInvitationTokenExpiry() == null || auth.getInvitationTokenExpiry().isBefore(LocalDateTime.now())) {
+            throw new ApiException(ErrorCode.INVITATION_TOKEN_INVALID);
+        }
+
+        String salt = BCrypt.gensalt();
+        String hashedPassword = BCrypt.hashpw(request.getPassword(), salt);
+
+        auth.setSalt(salt);
+        auth.setPassword(hashedPassword);
+        auth.setInvitationToken(null);
+        auth.setInvitationTokenExpiry(null);
+        authRepository.save(auth);
+
+        User user = userRepository.findById(auth.getUserId())
+                .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
+        user.setStatus(User.UserStatus.activated);
+        userRepository.save(user);
+
+        return generateTokenResponse(user);
     }
 
     private TokenResponse generateTokenResponse(User user) {

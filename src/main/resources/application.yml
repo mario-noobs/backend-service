@@ -129,6 +129,11 @@ resilience4j:
 
 # Email Service Library
 app:
+  frontend-url: ${FRONTEND_URL:http://localhost}
+  password-reset:
+    expiry-minutes: 30
+  invitation:
+    expiry-hours: 72
   email:
     from-address: ${EMAIL_FROM:noreply@face-system.local}
     from-name: Face Recognition System

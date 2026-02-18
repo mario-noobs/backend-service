@@ -15,8 +15,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.lang.NonNull;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -51,12 +49,14 @@ public class AuditLoggingFilter extends OncePerRequestFilter {
             long duration = System.currentTimeMillis() - startTime;
             int statusCode = response.getStatus();
 
-            // Extract actor info from SecurityContext
+            // Extract actor info from request attribute (set by JwtAuthenticationFilter)
+            // Cannot use SecurityContext here because SecurityContextHolderFilter
+            // clears the ThreadLocal before this outermost filter's finally block runs
             Long actorId = null;
             String actorEmail = null;
             String actorRole = null;
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth != null && auth.getPrincipal() instanceof AuthenticatedUser user) {
+            AuthenticatedUser user = (AuthenticatedUser) request.getAttribute("_audit_user");
+            if (user != null) {
                 actorId = user.getUserId();
                 actorEmail = user.getEmail();
                 actorRole = user.getRoleName();

@@ -39,6 +39,18 @@ public class Auth {
     @Column(name = "facebook_id", length = 35)
     private String facebookId;
 
+    @Column(name = "reset_token", length = 100)
+    private String resetToken;
+
+    @Column(name = "reset_token_expiry")
+    private LocalDateTime resetTokenExpiry;
+
+    @Column(name = "invitation_token", length = 100)
+    private String invitationToken;
+
+    @Column(name = "invitation_token_expiry")
+    private LocalDateTime invitationTokenExpiry;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

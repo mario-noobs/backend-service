@@ -3,6 +3,7 @@ package com.mario.backend.users.controller;
 import com.mario.backend.audit.dto.PageResponse;
 import com.mario.backend.common.dto.ApiResponse;
 import com.mario.backend.common.exception.ApiException;
+import com.mario.backend.users.dto.AdminCreateUserRequest;
 import com.mario.backend.users.dto.UpdateProfileRequest;
 import com.mario.backend.users.dto.UserResponse;
 import com.mario.backend.users.entity.User;
@@ -17,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -68,6 +70,14 @@ public class UserAdminController {
             @Valid @RequestBody UpdateProfileRequest request) {
         UserResponse profile = userService.updateProfile(id, request);
         return ResponseEntity.ok(ApiResponse.success(profile));
+    }
+
+    @PostMapping("/invite")
+    @PreAuthorize("hasAuthority('user:update_any')")
+    public ResponseEntity<ApiResponse<UserResponse>> inviteUser(
+            @Valid @RequestBody AdminCreateUserRequest request) {
+        UserResponse userResponse = userService.createUserWithInvitation(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(userResponse));
     }
 
     @PutMapping("/{id}/status")

@@ -51,4 +51,22 @@ public class AuthController {
         authService.changePassword(user.getUserId(), request);
         return ResponseEntity.ok(ApiResponse.success("Password changed successfully"));
     }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<String>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        authService.forgotPassword(request);
+        return ResponseEntity.ok(ApiResponse.success("If your email is registered, you will receive a password reset link"));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse<String>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request);
+        return ResponseEntity.ok(ApiResponse.success("Password has been reset successfully"));
+    }
+
+    @PostMapping("/accept-invitation")
+    public ResponseEntity<ApiResponse<TokenResponse>> acceptInvitation(@Valid @RequestBody AcceptInvitationRequest request) {
+        TokenResponse tokenResponse = authService.acceptInvitation(request);
+        return ResponseEntity.ok(ApiResponse.success(tokenResponse));
+    }
 }

@@ -1,10 +1,14 @@
 package com.mario.backend.users.service;
 
+import com.mario.backend.auth.entity.Auth;
+import com.mario.backend.auth.repository.AuthRepository;
 import com.mario.backend.common.exception.ApiException;
 import com.mario.backend.common.exception.ErrorCode;
 import com.mario.backend.logging.annotation.Traceable;
 import com.mario.backend.rbac.entity.Permission;
 import com.mario.backend.rbac.entity.Role;
+import com.mario.backend.rbac.repository.RoleRepository;
+import com.mario.backend.users.dto.AdminCreateUserRequest;
 import com.mario.backend.users.dto.UpdateProfileRequest;
 import com.mario.backend.users.dto.UpdateUserProfileRequest;
 import com.mario.backend.users.dto.UserProfileResponse;
@@ -13,12 +17,17 @@ import com.mario.backend.users.entity.User;
 import com.mario.backend.users.entity.UserProfile;
 import com.mario.backend.users.repository.UserProfileRepository;
 import com.mario.backend.users.repository.UserRepository;
+import com.mario.email.EmailRequest;
+import com.mario.email.EmailService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +35,15 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final UserProfileRepository userProfileRepository;
+    private final AuthRepository authRepository;
+    private final RoleRepository roleRepository;
+    private final EmailService emailService;
+
+    @Value("${app.frontend-url:http://localhost}")
+    private String frontendUrl;
+
+    @Value("${app.invitation.expiry-hours:72}")
+    private int invitationExpiryHours;
 
     @Traceable("user.getProfile")
     public UserResponse getProfile(Long userId) {
@@ -114,6 +132,52 @@ public class UserService {
         }
 
         user = userRepository.save(user);
+        return mapToResponse(user);
+    }
+
+    @Traceable("user.createWithInvitation")
+    @Transactional
+    public UserResponse createUserWithInvitation(AdminCreateUserRequest request) {
+        if (authRepository.existsByEmail(request.getEmail())) {
+            throw new ApiException(ErrorCode.EMAIL_EXISTS);
+        }
+
+        Role role = roleRepository.findByName(request.getRoleName())
+                .orElseThrow(() -> new ApiException(ErrorCode.ROLE_NOT_FOUND));
+
+        User user = User.builder()
+                .firstName(request.getFirstName())
+                .lastName(request.getLastName())
+                .email(request.getEmail())
+                .status(User.UserStatus.invited)
+                .role(role)
+                .build();
+        user = userRepository.save(user);
+
+        String invitationToken = UUID.randomUUID().toString();
+
+        Auth auth = Auth.builder()
+                .userId(user.getId())
+                .email(request.getEmail())
+                .authType(Auth.AuthType.email_password)
+                .invitationToken(invitationToken)
+                .invitationTokenExpiry(LocalDateTime.now().plusHours(invitationExpiryHours))
+                .build();
+        authRepository.save(auth);
+
+        String setupUrl = frontendUrl + "/accept-invitation?token=" + invitationToken;
+
+        emailService.send(EmailRequest.builder()
+                .to(request.getEmail())
+                .subject("You're invited to join Face Recognition System")
+                .templateName("invitation")
+                .model("firstName", request.getFirstName())
+                .model("email", request.getEmail())
+                .model("role", role.getName())
+                .model("setupUrl", setupUrl)
+                .model("expiryHours", invitationExpiryHours)
+                .build());
+
         return mapToResponse(user);
     }
 

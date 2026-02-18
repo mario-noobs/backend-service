@@ -25,4 +25,14 @@
     <sqlFile path="../common/2026.02.18_02__enrich_audit_logs.sql"/>
   </changeSet>
 
+  <!-- Add password reset token fields to auths -->
+  <changeSet id="20260218-03" author="dung.bui">
+    <sqlFile path="../common/2026.02.18_03__add_password_reset_fields.sql"/>
+  </changeSet>
+
+  <!-- Add invitation token fields to auths -->
+  <changeSet id="20260218-04" author="dung.bui">
+    <sqlFile path="../common/2026.02.18_04__add_invitation_fields.sql"/>
+  </changeSet>
+
 </databaseChangeLog>

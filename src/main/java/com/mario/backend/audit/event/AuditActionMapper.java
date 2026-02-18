@@ -25,6 +25,9 @@ public final class AuditActionMapper {
         rule("POST", "/api/v1/user/register", "auth:register", "auth", -1);
         rule("POST", "/api/v1/user/logout", "auth:logout", "auth", -1);
         rule("POST", "/api/v1/user/refresh", "auth:refresh", "auth", -1);
+        rule("POST", "/api/v1/user/forgot-password", "auth:forgot_password", "auth", -1);
+        rule("POST", "/api/v1/user/reset-password", "auth:reset_password", "auth", -1);
+        rule("POST", "/api/v1/user/accept-invitation", "auth:accept_invitation", "auth", -1);
 
         // Profile endpoints
         rule("POST", "/profile", "profile:read", "profile", -1);
@@ -45,6 +48,7 @@ public final class AuditActionMapper {
         ruleWithId("GET", "/api/v1/admin/users/(\\d+)", "user:read", "user", 1);
         ruleWithId("PUT", "/api/v1/admin/users/(\\d+)/status", "user:update_status", "user", 1);
         ruleWithId("PUT", "/api/v1/admin/users/(\\d+)", "user:update", "user", 1);
+        rule("POST", "/api/v1/admin/users/invite", "user:invite", "user", -1);
 
         // RBAC endpoints (catch-all for admin rbac)
         ruleWithId(".*", "/api/v1/admin/rbac/.*", "rbac:manage", "rbac", -1);

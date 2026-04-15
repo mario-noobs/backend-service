@@ -31,3 +31,21 @@ jobs:
     with:
       image_name: backend-service
       context: "."
+
+  dispatch:
+    name: Notify orchestrator
+    needs: docker
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send repository_dispatch to face-microservice
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.ORCHESTRATOR_DISPATCH_TOKEN }}
+          repository: mario-noobs/face-microservice
+          event-type: service-image-published
+          client-payload: |
+            {
+              "service": "backend-service",
+              "tag": "${{ needs.docker.outputs.image_tag }}"
+            }

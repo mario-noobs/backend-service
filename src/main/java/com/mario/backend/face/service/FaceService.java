@@ -47,7 +47,7 @@ public class FaceService {
     private final HttpClientService httpClientService;
     private final IdempotencyService idempotencyService;
 
-    @Value("${face-recognition.service-url:http://face-recognition-service:5000}")
+    @Value("${face-recognition.service-url:http://face-ai-service:5000}")
     private String faceRecognitionServiceUrl;
 
     @Traceable("face.registerFace")
